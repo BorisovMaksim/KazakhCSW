@@ -142,3 +142,6 @@ outputs
 **.model 
 **.vocab
 **/data
+**/fairseq_data
+**/generated
+**/tmp
