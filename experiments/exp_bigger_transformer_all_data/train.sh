@@ -1,11 +1,7 @@
-# python create_fairseq_dataset.py --train_datasets nu kaznu opus statmt wikimatrix \
-#--val_datasets mix_test --test_datasets nu kaznu ntrex mix_test ted --src_lang kk --tgt_lang ru --save_path /home/itmo/Projects/fairseq/examples/m2m_100/experiments/exp_transformer_all_data_no_RTC/
-
-
 export CUDA_VISIBLE_DEVICES="1"
 
 
-fairseq-train ../exp_transformer_all_data_no_RTC/fairseq_data  \
+fairseq-train ../exp_transformer_all_data/fairseq_data  \
 --save-dir ./checkpoint/m2m/ --task translation_multi_simple_epoch \
 --encoder-normalize-before \
 --langs 'kk,ru' --lang-pairs 'kk-ru' --max-tokens 1800 --decoder-normalize-before \
@@ -17,4 +13,4 @@ fairseq-train ../exp_transformer_all_data_no_RTC/fairseq_data  \
 --seed 222 --log-format simple --patience 10 \
 --arch transformer_wmt_en_de_big --encoder-layers 24 --decoder-layers 24 \
 --encoder-ffn-embed-dim 8192 --decoder-ffn-embed-dim 8192 --encoder-layerdrop 0.05 --decoder-layerdrop 0.05 \
---share-decoder-input-output-embed --share-all-embeddings --ddp-backend no_c10d  --wandb-project exp_transformer --fp16
+--share-decoder-input-output-embed --share-all-embeddings --ddp-backend no_c10d  --wandb-project kk-ru-csw --fp16
