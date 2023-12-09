@@ -1,4 +1,5 @@
 # Code-Switching Machine Translation from Kazakh to Russian 
+Wandb project: https://wandb.ai/maksim-borisov-2013/kk-ru-csw
 
 ## Results
 
