@@ -14,7 +14,11 @@ python generate.py --data_path ./experiments/exp_transformer/fairseq_data/ --mod
 """
 python generate.py --data_path ./experiments/exp_transformer_all_data/fairseq_data/ --model_path ./experiments/exp_transformer_all_data_bidirectional/checkpoints/transformer_copy_cs_paper/checkpoint_last.pt --subset test3 --src_lang kk --tgt_lang ru --save_path ./experiments/exp_transformer_all_data_bidirectional/ --batch_size 100 --task multilingual_translation --lang_pairs kk-ru,ru-kk
 """
+# Translation multi simple epoch
 
+"""
+python generate.py --data_path ./experiments/exp_transformer_all_data_no_RTC/fairseq_data/ --model_path ./experiments/exp_bigger_transformer_all_data/checkpoint/m2m/checkpoint_last.pt --subset test4 --src_lang kk --tgt_lang ru --save_path ./experiments/exp_bigger_transformer_all_data/ --batch_size 100 --task translation_multi_simple_epoch --lang_pairs kk-ru,ru-kk
+"""
 
 def fairseq_generate(data_path, subset, model_path, src_lang, tgt_lang, bpe, beam, save_path, batch_size, task, lang_pairs):
     out_path = Path(save_path) / 'generated' /f"{subset}.txt"
