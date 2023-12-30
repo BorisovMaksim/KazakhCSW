@@ -1,8 +1,8 @@
 export CUDA_VISIBLE_DEVICES="1"
 
 
-fairseq-train ../exp_transformer_all_data/fairseq_data  \
---valid-subset test3 --restore-file  ./checkpoint/m2m/checkpoint_best.pt \
+fairseq-train ./fairseq_data  \
+--valid-subset test3  \
 --save-dir ./checkpoint/m2m/ --task translation_multi_simple_epoch \
 --encoder-normalize-before \
 --langs 'kk,ru' --lang-pairs 'kk-ru' --max-tokens 1800 --decoder-normalize-before \
@@ -14,4 +14,4 @@ fairseq-train ../exp_transformer_all_data/fairseq_data  \
 --seed 222 --log-format simple --patience 10 \
 --arch transformer_wmt_en_de_big --encoder-layers 24 --decoder-layers 24 \
 --encoder-ffn-embed-dim 8192 --decoder-ffn-embed-dim 8192 --encoder-layerdrop 0.05 --decoder-layerdrop 0.05 \
---share-decoder-input-output-embed --share-all-embeddings --ddp-backend no_c10d  --wandb-project kk-ru-csw --fp16
+--share-decoder-input-output-embed --share-all-embeddings --ddp-backend no_c10d  --wandb-project kk-ru-csw --fp16 --no-last-checkpoints

@@ -6,7 +6,7 @@ import sentencepiece as spm
 import shutil
 from tqdm import tqdm
 import uuid
-
+import random
 
 from datasets import DATASETS
 
@@ -17,7 +17,8 @@ python create_fairseq_dataset.py --train_datasets nu kaznu opus RTC statmt wikim
 """
 
 class CreateFairseqDataset:
-    def __init__(self, train_datasets, val_datasets, test_datasets, src_lang, tgt_lang, num_workers, bpe, joined_dictionary, save_path):
+    def __init__(self, train_datasets, val_datasets, test_datasets, src_lang, tgt_lang, num_workers,
+                 bpe, joined_dictionary, save_path, spm_model_path, data_prefix, align, percent):
         self.train_datasets = train_datasets
         self.val_datasets = val_datasets
         self.test_datasets = test_datasets
@@ -27,6 +28,10 @@ class CreateFairseqDataset:
         self.bpe = bpe
         self.joined_dictionary = joined_dictionary
         self.save_path = save_path
+        self.spm_model_path = spm_model_path
+        self.data_prefix = data_prefix
+        self.align = align
+        self.percent = percent
 
 
 
@@ -35,7 +40,7 @@ class CreateFairseqDataset:
         tgt_data = []
         with open(str(data_path) + "." + self.src_lang) as f, open(str(data_path) + "." + self.tgt_lang) as g:
             for src_line, tgt_line in zip(f, g):
-                if src_line and tgt_line:
+                if src_line != "" and tgt_line != "":
                     src_data.append(src_line)
                     tgt_data.append(tgt_line)
         return src_data, tgt_data
@@ -65,9 +70,8 @@ class CreateFairseqDataset:
                 tgt_encoded = sp.encode(tgt_line, out_type=str)
                 min_length = min(len(src_encoded), len(tgt_encoded))
                 max_length = max(len(src_encoded), len(tgt_encoded))
-                
                     
-                if filter and (max_length > 250 or max_length / min_length > 3):
+                if min_length == 0 or (filter and (max_length > 250 or max_length / min_length > 2)):
                     continue
                 data_src_save.append(" ".join(src_encoded))
                 data_tgt_save.append(" ".join(tgt_encoded))
@@ -84,6 +88,7 @@ class CreateFairseqDataset:
             for line in train_src_data + train_tgt_data:
                 f.write(line + "\n")
         spm.SentencePieceTrainer.train(input=tmp_all_train_data.name, model_prefix='spm', vocab_size=32000, model_type='bpe')
+        
         shutil.move('spm.model', self.save_path)
         shutil.move('spm.vocab', self.save_path)
         print("Sentencepiece model is trained!")
@@ -93,35 +98,112 @@ class CreateFairseqDataset:
         data_src_save, data_tgt_save = self.apply_bpe(sp, src_data, tgt_data, filter=False)
         tmp_data_path = self.save_temp_data(data_src_save, data_tgt_save)
         return tmp_data_path
+    
+    def align_dataset(self, src_data, tgt_data):
+        tmp_dir =  Path(self.save_path) / 'tmp' 
+        tmp_dir.mkdir(exist_ok=True, parents=True)
         
+        tmp_align_file = tmp_dir / f"align.{self.src_lang}-{self.tgt_lang}"
+        tmp_align_file_reverse = tmp_dir / f"align.{self.tgt_lang}-{self.src_lang}"
+        tmp_align_forward = tmp_dir / "forward.align"
+        tmp_align_reverse = tmp_dir / "reverse.align"
+        tmp_align_gdf = tmp_dir / "gdf.align"        
         
+        with open(tmp_align_file, 'w') as f, open(tmp_align_file_reverse, 'w') as f_reverse:
+            for i, (src_line, tgt_line) in enumerate(zip(src_data, tgt_data)):
+                src_line = src_line.replace("\n", "").strip().replace("|||", "")
+                tgt_line = tgt_line.replace("\n", "").strip().replace("|||", "")
+                
+                save_line = src_line + " ||| " + tgt_line
+                save_line_reverse = tgt_line  + " ||| " + src_line
+                f.write(save_line + "\n")
+                f_reverse.write(save_line_reverse + "\n")    
+        print(f"Starting alignment: ")    
+                
+        # os.system(f"../fast_align/build/fast_align -i {tmp_align_file} -d -o -v > {tmp_align_forward}")
+        # os.system(f"../fast_align/build/fast_align -i {tmp_align_file_reverse} -d -o -v -r > {tmp_align_reverse}")
+        # os.system(f"../fast_align/build/atools  -i {tmp_align_forward} -j {tmp_align_reverse} -c grow-diag-final-and > {tmp_align_gdf}")
+        
+        all_minimal_units = []
+        with open(tmp_align_gdf) as f:
+            for line in f.read().split("\n")[:-1]:
+                # if line == "":
+                    # continue
+                indexes = line.split()
+                src2tgt_units = {}
+                for index in indexes:
+                    src_index, tgt_index = index.split("-")
+                    if src_index in src2tgt_units:
+                        src2tgt_units[src_index] += [tgt_index]
+                    else:
+                        src2tgt_units[src_index] = [tgt_index]
+                all_minimal_units.append(src2tgt_units)
+                
+        src_data_cs = []
+        print(len(src_data), len(tgt_data), len(all_minimal_units))
+        for src_line, tgt_line, minimal_units in zip(src_data, tgt_data, all_minimal_units):
+            src_line = src_line.replace("\n", "").split()
+            tgt_line = tgt_line.replace("\n", "").split()
+    
+            numwords = max(1, int(len(src_line) * self.percent / 100))
+            minimal_units_keys = list(minimal_units.keys())
+            minimal_units_keys = random.sample(minimal_units_keys, len(minimal_units_keys))
+            
+            num_replacements = 0
+            for src_index in minimal_units_keys:
+                if int(src_index) >= len(src_line):
+                    continue
+                for tgt_indexes in minimal_units[src_index]:
+                    if len(tgt_indexes) > 1:
+                        continue
+                    if num_replacements > numwords:
+                        break
+                    num_replacements += len(tgt_indexes)
+                    line_to_replace = " ".join([tgt_line[int(i)] for i in tgt_indexes if int(i) < len(tgt_line)])
+                    # print(f"{src_line[int(src_index)]} -> {line_to_replace}")
+                    src_line[int(src_index)] = line_to_replace
+                else:
+                    continue
+                break
+            src_data_cs.append(" ".join(src_line))
+            
+        assert len(src_data_cs) == len(tgt_data)
+        return src_data_cs, tgt_data
+        
+
 
     def fairseq_preprocess(self):    
         destdir = Path(self.save_path) / 'fairseq_data'
-        model_path = Path(self.save_path) / 'spm.model'
+        model_path = Path(self.save_path) / 'spm.model' if self.spm_model_path is None  else Path(self.spm_model_path)
+        Path(self.save_path).mkdir(exist_ok=True, parents=True)
         
         train_src_data = []
         train_tgt_data = []
         for dataset in self.train_datasets:
-            train_path = DATASETS[dataset] / 'processed' / 'train' / 'kk-ru_processed'
+            train_path = DATASETS[dataset] / 'processed' / 'train' / self.data_prefix
+            print(f"Processing {train_path}")
             assert train_path.with_suffix("." + self.src_lang).exists() and train_path.with_suffix("." + self.tgt_lang).exists()
             src_data, tgt_data = self.read_data(train_path)
             train_src_data.extend(src_data)
             train_tgt_data.extend(tgt_data)      
             
+        if self.align:
+            train_src_data, train_tgt_data = self.align_dataset(src_data=train_src_data, 
+                               tgt_data=train_tgt_data)
             
         if not model_path.exists():
             self.train_spm(train_src_data, train_tgt_data)
             
         sp  = spm.SentencePieceProcessor(model_file=model_path.as_posix())
+        
         train_data_src_save, train_data_tgt_save = self.apply_bpe(sp, train_src_data, train_tgt_data, filter=True)
         trainpref = self.save_temp_data(train_data_src_save, train_data_tgt_save)
-                    
+        
         
             
         validpref = []
         for dataset in self.val_datasets:
-            valid_path = DATASETS[dataset] / 'processed' / 'dev' / 'kk-ru_processed'
+            valid_path = DATASETS[dataset] / 'processed' / 'dev' / "kk-ru_processed"
             assert valid_path.with_suffix("." + self.src_lang).exists() and valid_path.with_suffix("." + self.tgt_lang).exists()
             temp_val_path = self.process_dataset(sp, valid_path)
             validpref.append(str(temp_val_path))
@@ -131,7 +213,7 @@ class CreateFairseqDataset:
             
         testpref = []
         for dataset in self.test_datasets:
-            test_path = DATASETS[dataset] / 'processed' / 'test' / 'kk-ru_processed'
+            test_path = DATASETS[dataset] / 'processed' / 'test' / "kk-ru_processed"
             assert test_path.with_suffix("." + self.src_lang).exists() and test_path.with_suffix("." + self.tgt_lang).exists()
             temp_test_path = self.process_dataset(sp, test_path)
             testpref.append(str(temp_test_path))
@@ -168,6 +250,10 @@ if __name__ == '__main__':
     parser.add_argument('--bpe', type=str, default='sentencepiece')
     parser.add_argument('--save_path', type=str, required=True)
     parser.add_argument('--joined_dictionary', type=bool, default=True)
+    parser.add_argument('--spm_model_path', type=str, default=None)
+    parser.add_argument('--data_prefix', type=str, default="kk-ru_processed")
+    parser.add_argument('--align', type=bool, default=False)
+    parser.add_argument('--percent', type=int, default=15)
 
     dataset = CreateFairseqDataset(**vars(parser.parse_args()))
     dataset.fairseq_preprocess()

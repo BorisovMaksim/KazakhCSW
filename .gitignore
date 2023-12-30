@@ -145,3 +145,7 @@ outputs
 **/fairseq_data
 **/generated
 **/tmp
+
+*.out
+*.png
+*.pt
