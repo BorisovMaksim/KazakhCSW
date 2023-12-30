@@ -120,9 +120,9 @@ class CreateFairseqDataset:
                 f_reverse.write(save_line_reverse + "\n")    
         print(f"Starting alignment: ")    
                 
-        # os.system(f"../fast_align/build/fast_align -i {tmp_align_file} -d -o -v > {tmp_align_forward}")
-        # os.system(f"../fast_align/build/fast_align -i {tmp_align_file_reverse} -d -o -v -r > {tmp_align_reverse}")
-        # os.system(f"../fast_align/build/atools  -i {tmp_align_forward} -j {tmp_align_reverse} -c grow-diag-final-and > {tmp_align_gdf}")
+        os.system(f"../fast_align/build/fast_align -i {tmp_align_file} -d -o -v > {tmp_align_forward}")
+        os.system(f"../fast_align/build/fast_align -i {tmp_align_file_reverse} -d -o -v -r > {tmp_align_reverse}")
+        os.system(f"../fast_align/build/atools  -i {tmp_align_forward} -j {tmp_align_reverse} -c grow-diag-final-and > {tmp_align_gdf}")
         
         all_minimal_units = []
         with open(tmp_align_gdf) as f:
