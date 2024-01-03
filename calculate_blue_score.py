@@ -40,4 +40,4 @@ if __name__ == '__main__':
     parser.add_argument("--detokenize_hyp", type=bool, default=False)
     parser.add_argument("--detokenize_ref", type=bool, default=False)
     args = parser.parse_args()
-    main(**vars(args))
+    calculate_blue(**vars(args))

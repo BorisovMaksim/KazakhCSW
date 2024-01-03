@@ -18,7 +18,7 @@ python create_fairseq_dataset.py --train_datasets nu kaznu opus RTC statmt wikim
 
 class CreateFairseqDataset:
     def __init__(self, train_datasets, val_datasets, test_datasets, src_lang, tgt_lang, num_workers,
-                 bpe, joined_dictionary, save_path, spm_model_path, data_prefix, align, percent):
+                 bpe, joined_dictionary, save_path, spm_model_path, data_prefix, align, percent, test_prefix, dict):
         self.train_datasets = train_datasets
         self.val_datasets = val_datasets
         self.test_datasets = test_datasets
@@ -32,6 +32,8 @@ class CreateFairseqDataset:
         self.data_prefix = data_prefix
         self.align = align
         self.percent = percent
+        self.test_prefix = test_prefix
+        self.dict = dict
 
 
 
@@ -41,8 +43,8 @@ class CreateFairseqDataset:
         with open(str(data_path) + "." + self.src_lang) as f, open(str(data_path) + "." + self.tgt_lang) as g:
             for src_line, tgt_line in zip(f, g):
                 if src_line != "" and tgt_line != "":
-                    src_data.append(src_line)
-                    tgt_data.append(tgt_line)
+                    src_data.append(src_line.replace("\n", ""))
+                    tgt_data.append(tgt_line.replace("\n", ""))
         return src_data, tgt_data
 
     def save_temp_data(self, data_src_save, data_tgt_save):
@@ -190,6 +192,8 @@ class CreateFairseqDataset:
         if self.align:
             train_src_data, train_tgt_data = self.align_dataset(src_data=train_src_data, 
                                tgt_data=train_tgt_data)
+            # self.save_temp_data(train_src_data, train_tgt_data)
+            # exit()
             
         if not model_path.exists():
             self.train_spm(train_src_data, train_tgt_data)
@@ -213,7 +217,7 @@ class CreateFairseqDataset:
             
         testpref = []
         for dataset in self.test_datasets:
-            test_path = DATASETS[dataset] / 'processed' / 'test' / "kk-ru_processed"
+            test_path = DATASETS[dataset] / 'processed' / 'test' / self.test_prefix
             assert test_path.with_suffix("." + self.src_lang).exists() and test_path.with_suffix("." + self.tgt_lang).exists()
             temp_test_path = self.process_dataset(sp, test_path)
             testpref.append(str(temp_test_path))
@@ -221,18 +225,19 @@ class CreateFairseqDataset:
         testpref = ",".join(testpref)
         print(f"Test datasets: {testpref}")
                 
-            
+        print(f"{self.joined_dictionary=}")
         os.system(f"""fairseq-preprocess \
         --source-lang {self.src_lang} --target-lang {self.tgt_lang} --bpe {self.bpe}  \
         --trainpref   {trainpref}  \
         --validpref {validpref}   \
         --testpref  {testpref} \
-        --destdir {str(destdir)}    --workers {self.num_workers}  {'--joined-dictionary' if self.joined_dictionary else ''}
+        --destdir {str(destdir)}  --workers {self.num_workers}  {'--joined-dictionary' if self.joined_dictionary else ''} \
+        {('--srcdict ' + self.dict) if self.dict else '' }  {('--tgtdict ' + self.dict) if self.dict else '' }
     """)
         
         tmp_path = Path(self.save_path) / 'tmp'
         assert tmp_path.is_dir()
-        os.system(f"rm -r {str(tmp_path)}")
+        # os.system(f"rm -r {str(tmp_path)}")
 
 
 
@@ -241,19 +246,21 @@ class CreateFairseqDataset:
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument("--train_datasets",  nargs='+', required=True, choices=list(DATASETS.keys()))
-    parser.add_argument("--val_datasets",  nargs='+', required=True, choices=list(DATASETS.keys()))
-    parser.add_argument("--test_datasets",  nargs='+', required=True, choices=list(DATASETS.keys()))
+    parser.add_argument("--val_datasets",  nargs='+', required=False, choices=list(DATASETS.keys()))
+    parser.add_argument("--test_datasets",  nargs='+', required=False, choices=list(DATASETS.keys()))
     
     parser.add_argument('--src_lang', type=str, required=True, help='Source language')
     parser.add_argument('--tgt_lang', type=str, required=True, help='Target language')
     parser.add_argument('--num_workers', type=int, default=8)
     parser.add_argument('--bpe', type=str, default='sentencepiece')
     parser.add_argument('--save_path', type=str, required=True)
-    parser.add_argument('--joined_dictionary', type=bool, default=True)
+    parser.add_argument('--joined_dictionary', type=bool, default=False)
     parser.add_argument('--spm_model_path', type=str, default=None)
     parser.add_argument('--data_prefix', type=str, default="kk-ru_processed")
+    parser.add_argument('--test_prefix', type=str, default="kk-ru_processed")
     parser.add_argument('--align', type=bool, default=False)
     parser.add_argument('--percent', type=int, default=15)
+    parser.add_argument('--dict', type=str, default="")
 
     dataset = CreateFairseqDataset(**vars(parser.parse_args()))
     dataset.fairseq_preprocess()

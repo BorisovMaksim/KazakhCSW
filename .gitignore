@@ -149,3 +149,5 @@ outputs
 *.out
 *.png
 *.pt
+.vscode
+inference.ipynb
