@@ -122,15 +122,13 @@ class CreateFairseqDataset:
                 f_reverse.write(save_line_reverse + "\n")    
         print(f"Starting alignment: ")    
                 
-        os.system(f"../fast_align/build/fast_align -i {tmp_align_file} -d -o -v > {tmp_align_forward}")
-        os.system(f"../fast_align/build/fast_align -i {tmp_align_file_reverse} -d -o -v -r > {tmp_align_reverse}")
+        os.system(f"../fast_align/build/fast_align -I 20 -i {tmp_align_file} -d -o -v > {tmp_align_forward}")
+        os.system(f"../fast_align/build/fast_align -I 20 -i {tmp_align_file_reverse} -d -o -v -r > {tmp_align_reverse}")
         os.system(f"../fast_align/build/atools  -i {tmp_align_forward} -j {tmp_align_reverse} -c grow-diag-final-and > {tmp_align_gdf}")
         
         all_minimal_units = []
         with open(tmp_align_gdf) as f:
             for line in f.read().split("\n")[:-1]:
-                # if line == "":
-                    # continue
                 indexes = line.split()
                 src2tgt_units = {}
                 for index in indexes:
@@ -182,7 +180,11 @@ class CreateFairseqDataset:
         train_src_data = []
         train_tgt_data = []
         for dataset in self.train_datasets:
-            train_path = DATASETS[dataset] / 'processed' / 'train' / self.data_prefix
+            if dataset == 'RTC_subset':
+                train_path = DATASETS[dataset] / 'processed' / 'train' / 'kk-ru_processed'
+                
+            else:
+                train_path = DATASETS[dataset] / 'processed' / 'train' / self.data_prefix
             print(f"Processing {train_path}")
             assert train_path.with_suffix("." + self.src_lang).exists() and train_path.with_suffix("." + self.tgt_lang).exists()
             src_data, tgt_data = self.read_data(train_path)
@@ -192,8 +194,7 @@ class CreateFairseqDataset:
         if self.align:
             train_src_data, train_tgt_data = self.align_dataset(src_data=train_src_data, 
                                tgt_data=train_tgt_data)
-            # self.save_temp_data(train_src_data, train_tgt_data)
-            # exit()
+
             
         if not model_path.exists():
             self.train_spm(train_src_data, train_tgt_data)
@@ -225,7 +226,6 @@ class CreateFairseqDataset:
         testpref = ",".join(testpref)
         print(f"Test datasets: {testpref}")
                 
-        print(f"{self.joined_dictionary=}")
         os.system(f"""fairseq-preprocess \
         --source-lang {self.src_lang} --target-lang {self.tgt_lang} --bpe {self.bpe}  \
         --trainpref   {trainpref}  \

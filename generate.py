@@ -4,7 +4,7 @@ from pathlib import Path
 
 from calculate_blue_score import calculate_blue
 
-os.environ['CUDA_VISIBLE_DEVICES'] = "1"
+os.environ['CUDA_VISIBLE_DEVICES'] = "0"
 
 # Translation
 """ 

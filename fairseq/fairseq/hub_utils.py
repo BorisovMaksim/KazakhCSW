@@ -191,7 +191,7 @@ class GeneratorHubInterface(nn.Module):
         generator = self.task.build_generator(
             self.models,
             gen_args,
-            prefix_allowed_tokens_fn=prefix_allowed_tokens_fn,
+            # prefix_allowed_tokens_fn=prefix_allowed_tokens_fn,
         )
 
         inference_step_args = inference_step_args or {}
