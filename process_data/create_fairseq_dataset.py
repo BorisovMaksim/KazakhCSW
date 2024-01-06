@@ -122,13 +122,17 @@ class CreateFairseqDataset:
                 f_reverse.write(save_line_reverse + "\n")    
         print(f"Starting alignment: ")    
                 
-        os.system(f"../fast_align/build/fast_align -I 20 -i {tmp_align_file} -d -o -v > {tmp_align_forward}")
-        os.system(f"../fast_align/build/fast_align -I 20 -i {tmp_align_file_reverse} -d -o -v -r > {tmp_align_reverse}")
+        os.system(f"../fast_align/build/fast_align -i {tmp_align_file} -d -o -v > {tmp_align_forward}")
+        os.system(f"../fast_align/build/fast_align -i {tmp_align_file_reverse} -d -o -v -r > {tmp_align_reverse}")
         os.system(f"../fast_align/build/atools  -i {tmp_align_forward} -j {tmp_align_reverse} -c grow-diag-final-and > {tmp_align_gdf}")
+        exit()
+        
         
         all_minimal_units = []
         with open(tmp_align_gdf) as f:
-            for line in f.read().split("\n")[:-1]:
+            for line in f.read().split("\n"):
+                if line == "":
+                    continue
                 indexes = line.split()
                 src2tgt_units = {}
                 for index in indexes:
@@ -173,12 +177,14 @@ class CreateFairseqDataset:
 
 
     def fairseq_preprocess(self):    
+        print(f"Start dataset creation")
         destdir = Path(self.save_path) / 'fairseq_data'
         model_path = Path(self.save_path) / 'spm.model' if self.spm_model_path is None  else Path(self.spm_model_path)
         Path(self.save_path).mkdir(exist_ok=True, parents=True)
         
         train_src_data = []
         train_tgt_data = []
+        train_data_indexes = []
         for dataset in self.train_datasets:
             if dataset == 'RTC_subset':
                 train_path = DATASETS[dataset] / 'processed' / 'train' / 'kk-ru_processed'
@@ -188,14 +194,18 @@ class CreateFairseqDataset:
             print(f"Processing {train_path}")
             assert train_path.with_suffix("." + self.src_lang).exists() and train_path.with_suffix("." + self.tgt_lang).exists()
             src_data, tgt_data = self.read_data(train_path)
+            index = len(src_data) if len(train_data_indexes) == 0 else  len(src_data) + train_data_indexes[-1]
+            
             train_src_data.extend(src_data)
-            train_tgt_data.extend(tgt_data)      
+            train_tgt_data.extend(tgt_data)    
+            train_data_indexes.append(index)  
             
         if self.align:
+            print(train_data_indexes)
+            print(f"{train_data_indexes=}")
             train_src_data, train_tgt_data = self.align_dataset(src_data=train_src_data, 
                                tgt_data=train_tgt_data)
-
-            
+                        
         if not model_path.exists():
             self.train_spm(train_src_data, train_tgt_data)
             
